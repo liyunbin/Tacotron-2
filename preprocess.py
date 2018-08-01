@@ -19,7 +19,10 @@ def preprocess(args, input_folders, out_dir, hparams):
 def write_metadata(metadata, out_dir):
 	with open(os.path.join(out_dir, 'train.txt'), 'w', encoding='utf-8') as f:
 		for m in metadata:
-			f.write('|'.join([str(x) for x in m]) + '\n')
+			sample = '|'.join([str(x) for x in m])
+			sample = sample.strip('\n').strip(' ')
+			if sample != '':
+				f.write(sample + '\n')
 	mel_frames = sum([int(m[4]) for m in metadata])
 	timesteps = sum([int(m[3]) for m in metadata])
 	sr = hparams.sample_rate
@@ -32,20 +35,29 @@ def write_metadata(metadata, out_dir):
 
 def norm_data(args):
 
-	merge_books = (args.merge_books=='True')
+	merge_books = (args.merge_books == 'True')
 
 	print('Selecting data folders..')
-	supported_datasets = ['LJSpeech-1.0', 'LJSpeech-1.1', 'M-AILABS']
+	# 增加aishell-1的数据集
+	supported_datasets = ['LJSpeech-1.0', 'LJSpeech-1.1', 'M-AILABS', 'THCHS-30', 'aishell-1']
 	if args.dataset not in supported_datasets:
 		raise ValueError('dataset value entered {} does not belong to supported datasets: {}'.format(
 			args.dataset, supported_datasets))
 
+	if args.dataset.startswith('THCHS-30'):
+		return [os.path.join(args.base_dir, 'data_thchs30')]
+
 	if args.dataset.startswith('LJSpeech'):
 		return [os.path.join(args.base_dir, args.dataset)]
+	# 训练集和验证集加入训练
+	if args.dataset.startswith('aishell-1'):
+		print(args.base_dir)
+		print([''.join((args.base_dir, data)) for data in ('/data_aishell/wav/train', '/data_aishell/wav/dev')])
+		return [''.join((args.base_dir, data)) for data in ('/data_aishell/wav/train', '/data_aishell/wav/dev')]
 
 	
 	if args.dataset == 'M-AILABS':
-		supported_languages = ['en_US', 'en_UK', 'fr_FR', 'it_IT', 'de_DE', 'es_ES', 'ru_RU', 
+		supported_languages = ['en_US', 'en_UK', 'fr_FR', 'it_IT', 'de_DE', 'es_ES', 'ru_RU',
 			'uk_UK', 'pl_PL', 'nl_NL', 'pt_PT', 'fi_FI', 'se_SE', 'tr_TR', 'ar_SA']
 		if args.language not in supported_languages:
 			raise ValueError('Please enter a supported language to use from M-AILABS dataset! \n{}'.format(
@@ -57,13 +69,13 @@ def norm_data(args):
 				supported_voices))
 
 		path = os.path.join(args.base_dir, args.language, 'by_book', args.voice)
-		supported_readers = [e for e in os.listdir(path) if os.path.isdir(os.path.join(path,e))]
+		supported_readers = [e for e in os.listdir(path) if os.path.isdir(os.path.join(path, e))]
 		if args.reader not in supported_readers:
 			raise ValueError('Please enter a valid reader for your language and voice settings! \n{}'.format(
 				supported_readers))
 
 		path = os.path.join(path, args.reader)
-		supported_books = [e for e in os.listdir(path) if os.path.isdir(os.path.join(path,e))]
+		supported_books = [e for e in os.listdir(path) if os.path.isdir(os.path.join(path, e))]
 		if merge_books:
 			return [os.path.join(path, book) for book in supported_books]
 
@@ -85,10 +97,11 @@ def run_preprocess(args, hparams):
 def main():
 	print('initializing preprocessing..')
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--base_dir', default='')
-	parser.add_argument('--hparams', default='', 
+
+	parser.add_argument('--base_dir', default='/home/nlp/liyunbin/tts/Tacotron-2')
+	parser.add_argument('--hparams', default='',
 		help='Hyperparameter overrides as a comma-separated list of name=value pairs')
-	parser.add_argument('--dataset', default='LJSpeech-1.1')
+	parser.add_argument('--dataset', default='aishell-1')
 	parser.add_argument('--language', default='en_US')
 	parser.add_argument('--voice', default='female')
 	parser.add_argument('--reader', default='mary_ann')
@@ -101,7 +114,9 @@ def main():
 	modified_hp = hparams.parse(args.hparams)
 
 	assert args.merge_books in ('False', 'True')
-
+	# args.base_dir = '/home/nlp/liyunbin/tts/Tacotron-2'
+	print('args.base_dir {}'.format(args.base_dir))
+	print('args.dataset {}'.format(args.dataset))
 	run_preprocess(args, modified_hp)
 
 

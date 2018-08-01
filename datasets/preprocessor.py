@@ -1,10 +1,10 @@
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 from datasets import audio
-import os
+import glob, os
 import numpy as np 
 from wavenet_vocoder.util import mulaw_quantize, mulaw, is_mulaw, is_mulaw_quantize
-
+import pypinyin as pinyin
 
 def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12, tqdm=lambda x: x):
 	"""
@@ -12,7 +12,7 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
 
 	Args:
 		- hparams: hyper parameters
-		- input_dir: input directory that contains the files to prerocess
+		- input_dir: aishell-1需要处理的录音文件目录 （train/test/dev）
 		- mel_dir: output directory of the preprocessed speech mel-spectrogram dataset
 		- linear_dir: output directory of the preprocessed speech linear-spectrogram dataset
 		- wav_dir: output directory of the preprocessed speech audio dataset
@@ -22,18 +22,47 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
 	Returns:
 		- A list of tuple describing the train examples. this should be written to train.txt
 	"""
-
+	
+	"""
+		处理 aishell transcript  文本与语音文件的对应关系 key：录音文件名  value:翻译文本
+		这里将文本转换为拼音处理
+	"""
+	print(input_dirs[0])
+	trans_path = ''.join([os.path.abspath(os.path.join(input_dirs[0], "../..")), '/transcript/aishell_transcript_v0.8.txt'])
+	print('trans path is {}'.format(trans_path))
+	trans_dict = {}
+	trans_texts = open(trans_path, mode='r', encoding='utf-8').readlines()
+	for corpus in trans_texts:
+		arr = corpus.split(' ')
+		audio_id = arr[0]
+		text = ''.join(arr[1:])
+		pinyin_text = pinyin.lazy_pinyin(text, pinyin.Style.TONE3)
+		trans = ' '.join(pinyin_text)
+		trans_dict[audio_id] = trans
+		# print('trans process orgin:{}\n after processed :{}'.format(corpus, trans))
+	
+	print('len of trans dict {}'.format(len(trans_dict)))
 	# We use ProcessPoolExecutor to parallelize across processes, this is just for 
 	# optimization purposes and it can be omited
 	executor = ProcessPoolExecutor(max_workers=n_jobs)
 	futures = []
 	index = 1
+	
+	# 处理语音文件
 	for input_dir in input_dirs:
-		with open(os.path.join(input_dir, 'metadata.csv'), encoding='utf-8') as f:
-			for line in f:
-				parts = line.strip().split('|')
-				wav_path = os.path.join(input_dir, 'wavs', '{}.wav'.format(parts[0]))
-				text = parts[2]
+		# trn_files = glob.glob(os.path.join(input_dir, 'xmly_record', 'A*', '*.trn'))
+		# 列出所有的 wav文件
+		wave_files = glob.glob(os.path.join(input_dir, '*', '*.wav'))
+		print('input dir: {}  contains wav files are: {}'.format(input_dir, len(wave_files)))
+		for wav_file in wave_files:
+			wav_path = wav_file
+			audio_id = os.path.basename(wav_path).split('.')[0]
+			text = trans_dict.get(audio_id)
+			if text is None:
+				print('audio id {} not in trans_dict!!!'.format(audio_id))
+				continue
+			else:
+				print('audio id {}  in trans_dict!!!'.format(audio_id))
 				futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, index, wav_path, text, hparams)))
 				index += 1
 
@@ -62,25 +91,25 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 	try:
 		# Load the audio as numpy array
 		wav = audio.load_wav(wav_path, sr=hparams.sample_rate)
-	except FileNotFoundError: #catch missing wav exception
+	except FileNotFoundError:  # catch missing wav exception
 		print('file {} present in csv metadata is not present in wav folder. skipping!'.format(
 			wav_path))
 		return None
 
-	#rescale wav
+	# rescale wav
 	if hparams.rescale:
 		wav = wav / np.abs(wav).max() * hparams.rescaling_max
 
-	#M-AILABS extra silence specific
+	# M-AILABS extra silence specific
 	if hparams.trim_silence:
 		wav = audio.trim_silence(wav, hparams)
 
-	#Mu-law quantize
+	# Mu-law quantize
 	if is_mulaw_quantize(hparams.input_type):
-		#[0, quantize_channels)
+		# [0, quantize_channels)
 		out = mulaw_quantize(wav, hparams.quantize_channels)
 
-		#Trim silences
+		# Trim silences
 		start, end = audio.start_and_end_indices(out, hparams.silence_threshold)
 		wav = wav[start: end]
 		out = out[start: end]
@@ -89,13 +118,13 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 		out_dtype = np.int16
 
 	elif is_mulaw(hparams.input_type):
-		#[-1, 1]
+		# [-1, 1]
 		out = mulaw(wav, hparams.quantize_channels)
 		constant_values = mulaw(0., hparams.quantize_channels)
 		out_dtype = np.float32
 	
 	else:
-		#[-1, 1]
+		# [-1, 1]
 		out = wav
 		constant_values = 0.
 		out_dtype = np.float32
@@ -107,24 +136,24 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 	if mel_frames > hparams.max_mel_frames and hparams.clip_mels_length:
 		return None
 
-	#Compute the linear scale spectrogram from the wav
+	# Compute the linear scale spectrogram from the wav
 	linear_spectrogram = audio.linearspectrogram(wav, hparams).astype(np.float32)
 	linear_frames = linear_spectrogram.shape[1] 
 
-	#sanity check
+	# sanity check
 	assert linear_frames == mel_frames
 
-	#Ensure time resolution adjustement between audio and mel-spectrogram
+	# Ensure time resolution adjustement between audio and mel-spectrogram
 	fft_size = hparams.n_fft if hparams.win_size is None else hparams.win_size
 	l, r = audio.pad_lr(wav, fft_size, audio.get_hop_size(hparams))
 
-	#Zero pad for quantized signal
+	# Zero pad for quantized signal
 	out = np.pad(out, (l, r), mode='constant', constant_values=constant_values)
 	assert len(out) >= mel_frames * audio.get_hop_size(hparams)
 
-	#time resolution adjustement
-	#ensure length of raw audio is multiple of hop size so that we can use
-	#transposed convolution to upsample
+	# time resolution adjustement
+	# ensure length of raw audio is multiple of hop size so that we can use
+	# transposed convolution to upsample
 	out = out[:mel_frames * audio.get_hop_size(hparams)]
 	assert len(out) % audio.get_hop_size(hparams) == 0
 	time_steps = len(out)

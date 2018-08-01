@@ -5,6 +5,7 @@ from infolog import log
 from hparams import hparams
 from warnings import warn
 import os
+import pypinyin as pinyin
 
 
 def prepare_run(args):
@@ -21,7 +22,10 @@ def prepare_run(args):
 def get_sentences(args):
 	if args.text_list != '':
 		with open(args.text_list, 'rb') as f:
-			sentences = list(map(lambda l: l.decode("utf-8")[:-1], f.readlines()))
+			word_sentences = list(map(lambda l: l.decode("utf-8")[:-1], f.readlines()))
+			sentences = [' '.join(pinyin.lazy_pinyin(sentence, pinyin.Style.TONE3)) 
+						for sentence in word_sentences]
+
 	else:
 		sentences = hparams.sentences
 	return sentences
@@ -62,7 +66,7 @@ def main():
 	if args.mode not in accepted_modes:
 		raise ValueError('accepted modes are: {}, found {}'.format(accepted_modes, args.mode))
 
-	if args.mode=='live' and args.model=='Wavenet':
+	if args.mode == 'live' and args.model == 'Wavenet':
 		raise RuntimeError('Wavenet vocoder cannot be tested live due to its slow generation. Live only works with Tacotron!')
 
 	if args.GTA not in ('True', 'False'):
