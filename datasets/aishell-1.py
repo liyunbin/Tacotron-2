@@ -63,7 +63,7 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
                 print('audio id {} not in trans_dict!!!'.format(audio_id))
                 continue
             else:
-                print('audio id {}  in trans_dict!!!'.format(audio_id))
+                #print('audio id {}  in trans_dict!!!'.format(audio_id))
                 futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, index, wav_path, text, hparams)))
                 index += 1
 

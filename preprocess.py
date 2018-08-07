@@ -56,7 +56,7 @@ def norm_data(args):
 	
 	# baidu tts generate datasets.
 	if args.dataset.startswith('baidu_gen'):
-		return [args.data_root]
+		return [args.data_root+'/wav']
 	
 	# 训练集和验证集加入训练
 	if args.dataset.startswith('aishell-1'):
