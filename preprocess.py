@@ -60,10 +60,10 @@ def norm_data(args):
 	
 	# 训练集和验证集加入训练
 	if args.dataset.startswith('aishell-1'):
-		print(args.base_dir)
-		print([''.join((args.base_dir, data)) for data in ('/data_aishell/wav/train', '/data_aishell/wav/dev')])
-		return [''.join((args.base_dir, data)) for data in ('/data_aishell/wav/train', '/data_aishell/wav/dev')]
-
+		print(args.data_root)
+		data_paths = [(args.data_root+'/data_aishell/wav/train', args.data_root+'/data_aishell/wav/dev')]
+		print(data_paths)
+		return data_paths
 	
 	if args.dataset == 'M-AILABS':
 		supported_languages = ['en_US', 'en_UK', 'fr_FR', 'it_IT', 'de_DE', 'es_ES', 'ru_RU',
