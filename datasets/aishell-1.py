@@ -28,7 +28,7 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
         这里将文本转换为拼音处理
     """
     print(input_dirs[0])
-    trans_path = os.path.abspath(os.path.join(input_dirs[0], "../..")) + '/transcript/aishell_transcript_v0.8.txt'
+    trans_path = '/'.join(input_dirs[0].split('/')[:-2]) + '/transcript/aishell_transcript_v0.8.txt'
     print('trans path is {}'.format(trans_path))
     trans_dict = {}
     trans_texts = open(trans_path, mode='r', encoding='utf-8').readlines()

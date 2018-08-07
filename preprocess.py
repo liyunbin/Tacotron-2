@@ -61,7 +61,7 @@ def norm_data(args):
 	# 训练集和验证集加入训练
 	if args.dataset.startswith('aishell-1'):
 		print(args.data_root)
-		data_paths = [(args.data_root+'/data_aishell/wav/train', args.data_root+'/data_aishell/wav/dev')]
+		data_paths = [args.data_root+'/data_aishell/wav/train', args.data_root+'/data_aishell/wav/dev']
 		print(data_paths)
 		return data_paths
 	
