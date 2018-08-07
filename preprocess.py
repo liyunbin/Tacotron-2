@@ -4,7 +4,7 @@ import os
 from tqdm import tqdm
 from datasets import preprocessor
 from hparams import hparams
-
+import importlib
 
 def preprocess(args, input_folders, out_dir, hparams):
 	mel_dir = os.path.join(out_dir, 'mels')
@@ -13,7 +13,10 @@ def preprocess(args, input_folders, out_dir, hparams):
 	os.makedirs(mel_dir, exist_ok=True)
 	os.makedirs(wav_dir, exist_ok=True)
 	os.makedirs(linear_dir, exist_ok=True)
-	metadata = preprocessor.build_from_path(hparams, input_folders, mel_dir, linear_dir, wav_dir, args.n_jobs, tqdm=tqdm)
+	
+	# 支持动态加载不同数据集处理模块
+	mod = importlib.import_module('.'+args.dataset,'datasets')
+	metadata = mod.build_from_path(hparams, input_folders, mel_dir, linear_dir, wav_dir, args.n_jobs, tqdm=tqdm)
 	write_metadata(metadata, out_dir)
 
 def write_metadata(metadata, out_dir):
@@ -39,7 +42,8 @@ def norm_data(args):
 
 	print('Selecting data folders..')
 	# 增加aishell-1的数据集
-	supported_datasets = ['LJSpeech-1.0', 'LJSpeech-1.1', 'M-AILABS', 'THCHS-30', 'aishell-1']
+	supported_datasets = ['LJSpeech-1.0', 'LJSpeech-1.1', 'M-AILABS', 
+						'THCHS-30', 'aishell-1','baidu_gen']
 	if args.dataset not in supported_datasets:
 		raise ValueError('dataset value entered {} does not belong to supported datasets: {}'.format(
 			args.dataset, supported_datasets))
@@ -49,6 +53,11 @@ def norm_data(args):
 
 	if args.dataset.startswith('LJSpeech'):
 		return [os.path.join(args.base_dir, args.dataset)]
+	
+	# baidu tts generate datasets.
+	if args.dataset.startswith('baidu_gen'):
+		return [args.data_root]
+	
 	# 训练集和验证集加入训练
 	if args.dataset.startswith('aishell-1'):
 		print(args.base_dir)
@@ -101,6 +110,7 @@ def main():
 	parser.add_argument('--base_dir', default='/home/nlp/liyunbin/tts/Tacotron-2')
 	parser.add_argument('--hparams', default='',
 		help='Hyperparameter overrides as a comma-separated list of name=value pairs')
+	parser.add_argument('--data_root',default='')
 	parser.add_argument('--dataset', default='aishell-1')
 	parser.add_argument('--language', default='en_US')
 	parser.add_argument('--voice', default='female')
