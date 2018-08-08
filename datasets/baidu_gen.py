@@ -26,7 +26,7 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
     """
        Processed transcript.
     """
-    trans_path = '/'.join(input_dirs[0].split('/')[:-1]) + 'transcript/transcript.txt'
+    trans_path = '/'.join(input_dirs[0].split('/')[:-1]) + '/transcript/transcript.txt'
     print('The transcript path is {}'.format(trans_path))
     trans_dict = {}
     trans_texts = open(trans_path, mode='r', encoding='utf-8').readlines()
