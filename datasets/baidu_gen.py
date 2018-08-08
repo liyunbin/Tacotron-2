@@ -26,18 +26,23 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
     """
        Processed transcript.
     """
-    trans_path = '/'.join(input_dirs[0].split('/')[:-1]) + '/transcript/transcript.txt'
+    trans_path = '/'.join(input_dirs[0].split('/')[:-1]) + '/transcript/texts.txt'
     print('The transcript path is {}'.format(trans_path))
     trans_dict = {}
     trans_texts = open(trans_path, mode='r', encoding='utf-8').readlines()
     trans_texts = [text.strip('\n').strip(' ') for text in trans_texts]
+    idx = 1
     for corpus in trans_texts:
-        arr = corpus.split(' ')
-        audio_id = os.path.basename(arr[0]).split('.')[0]
-        text = ''.join(arr[1:])
-        pinyin_text = pinyin.lazy_pinyin(text, pinyin.Style.TONE3)
+#         arr = corpus.split(' ')
+#         audio_id = os.path.basename(arr[0]).split('.')[0]
+#         text = ''.join(arr[1:])
+#         pinyin_text = pinyin.lazy_pinyin(text, pinyin.Style.TONE3)
+#         trans = ' '.join(pinyin_text)
+#         trans_dict[audio_id] = trans 
+        pinyin_text = pinyin.lazy_pinyin(corpus, pinyin.Style.TONE3)
         trans = ' '.join(pinyin_text)
-        trans_dict[audio_id] = trans    
+        trans_dict[str(idx)] = trans
+        idx+=1
     print('len of trans dict {}'.format(len(trans_dict)))
     # We use ProcessPoolExecutor to parallelize across processes, this is just for 
     # optimization purposes and it can be omited
